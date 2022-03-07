@@ -7,6 +7,7 @@
 
 #include "util.h"
 #include "net.h"
+#include "arp.h"
 
 struct net_protocol {
     struct net_protocol *next;
@@ -262,6 +263,12 @@ net_init(void)
         return -1;
     }
     if (icmp_init() == -1) {
+        errorf("icmp_init() failure");
+        return -1;
+    }
+
+    if (arp_init() == -1)
+    {
         errorf("icmp_init() failure");
         return -1;
     }
