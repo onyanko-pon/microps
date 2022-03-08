@@ -312,7 +312,6 @@ arp_resolve(struct net_iface *iface, ip_addr_t pa, uint8_t *ha)
     return ARP_RESOLVE_ERROR;
   }
   mutex_lock(&mutex);
-  errorf("address %d", pa);
   cache = arp_cache_select(pa);
   if (!cache) {
     cache = arp_cache_alloc();
