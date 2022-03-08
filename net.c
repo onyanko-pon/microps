@@ -9,6 +9,7 @@
 #include "util.h"
 #include "net.h"
 #include "arp.h"
+#include "udp.h"
 
 struct net_protocol {
     struct net_protocol *next;
@@ -62,6 +63,7 @@ net_device_register(struct net_device *dev)
     infof("registered, dev=%s, type=0x%04x", dev->name, dev->type);
     return 0;
 }
+
 
 static int
 net_device_open(struct net_device *dev)
@@ -328,6 +330,12 @@ net_init(void)
     if (arp_init() == -1)
     {
         errorf("arp_init() failure");
+        return -1;
+    }
+
+    if (udp_init() == -1)
+    {
+        errorf("udp_init() failure");
         return -1;
     }
     infof("initialized");

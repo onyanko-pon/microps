@@ -157,6 +157,7 @@ arp_cache_update(ip_addr_t pa, const uint8_t *ha)
     return NULL;
   }
   cache->state = ARP_CACHE_STATE_RESOLVED;
+  memcpy(cache->ha, ha, ETHER_ADDR_LEN);
   gettimeofday(&cache->timestamp, NULL);
   // 14-3
 
@@ -179,7 +180,7 @@ arp_cache_insert(ip_addr_t pa, const uint8_t *ha)
   cache->state = ARP_CACHE_STATE_RESOLVED;
   gettimeofday(&cache->timestamp, NULL);
   cache->pa = pa;
-  memset(&cache->ha, *ha, ETHER_ADDR_LEN);
+  memcpy(cache->ha, ha, ETHER_ADDR_LEN);
   // 14 - 4
   debugf("INSERT: pa=%s, ha=%s", ip_addr_ntop(pa, addr1, sizeof(addr1)), ether_addr_ntop(ha, addr2, sizeof(addr2)));
   return cache;
@@ -202,7 +203,7 @@ arp_request(struct net_iface *iface, ip_addr_t tpa) {
   debugf("dev=%s, len=%zu", iface->dev->name, sizeof(request));
   arp_dump((uint8_t *)&request, sizeof(request));
 
-  return net_device_output(iface->dev, ETHER_TYPE_ARP, (uint8_t *)&request, sizeof(request), &tpa);
+  return net_device_output(iface->dev, ETHER_TYPE_ARP, (uint8_t *)&request, sizeof(request), NET_IFACE(iface)->dev->broadcast);
 }
 
 static int
@@ -229,6 +230,7 @@ arp_reply(struct net_iface *iface, const uint8_t *tha, ip_addr_t tpa, const uint
 static void
 arp_input(const uint8_t *data, size_t len, struct net_device *dev)
 {
+  errorf("arp input called");
   struct arp_ether_ip *msg;
   ip_addr_t spa, tpa;
   struct net_iface *iface;
