@@ -103,15 +103,13 @@ static void udp_pcb_release(struct udp_pcb *pcb)
   }
 }
 
-static struct udp_pcb * udp_pcb_select(ip_addr_t addr, uint16_t port)
+static struct udp_pcb*
+udp_pcb_select(ip_addr_t addr, uint16_t port)
 {
   struct udp_pcb *pcb;
-  for (pcb = pcbs; pcb < tailof(pcbs); pcb++)
-  {
-    if (pcb->state == UDP_PCB_STATE_OPEN)
-    {
-      if ((pcb->local.addr == IP_ADDR_ANY || addr == IP_ADDR_ANY || pcb->local.addr == addr) && pcb->local.port == port)
-      {
+  for (pcb = pcbs; pcb < tailof(pcbs); pcb++) {
+    if (pcb->state == UDP_PCB_STATE_OPEN) {
+      if ((pcb->local.addr == IP_ADDR_ANY || addr == IP_ADDR_ANY || pcb->local.addr == addr) && pcb->local.port == port) {
         return pcb;
       }
     }
@@ -296,6 +294,7 @@ int udp_open(void)
   }
   id = udp_pcb_id(pcb);
   mutex_unlock(&mutex);
+  fprintf(stderr, "udp opened...\n");
   return id;
   // ex 19-2
 }
@@ -324,6 +323,7 @@ int udp_bind(int id, struct ip_endpoint *local)
   struct udp_pcb *pcb, *exist;
   char ep1[IP_ENDPOINT_STR_LEN];
   char ep2[IP_ENDPOINT_STR_LEN];
+
   mutex_lock(&mutex);
   // ex 19-4
   // (1)
@@ -334,8 +334,11 @@ int udp_bind(int id, struct ip_endpoint *local)
     return -1;
   }
   // (2)
-  exist = udp_pcb_select(local->addr, local->addr);
-  if (exit) {
+  exist = udp_pcb_select(local->addr, local->port);
+  fprintf(stderr, "udp binded 1\n");
+  if (NULL != exit)
+  {
+    // errorf("exist1");
     errorf("already used exist:%s, local:%s",
       ip_endpoint_ntop(&exist->local, ep1, sizeof(ep1)),
       ip_endpoint_ntop(local, ep2, sizeof(ep2))
@@ -343,10 +346,14 @@ int udp_bind(int id, struct ip_endpoint *local)
     mutex_unlock(&mutex);
     return -1;
   }
+  // fprintf(stderr, "udp binded 2\n");
   // (3)
   pcb->local = *local;
   // ex 19-4
   debugf("bound, id=%d, local=%s", id, ip_endpoint_ntop(&pcb->local, ep1, sizeof(ep1)));
   mutex_unlock(&mutex);
+  // fprintf(stderr, "udp binded 3\n");
+
+  // fprintf(stderr, "udp binded...\n");
   return 0;
 }
