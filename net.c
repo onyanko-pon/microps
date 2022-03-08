@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "platform.h"
 
@@ -22,9 +23,18 @@ struct net_protocol_queue_entry {
     uint8_t data[];
 };
 
+struct net_timer
+{
+    struct net_timer *next;
+    struct timeval interval;
+    struct timeval last;
+    void (*handler)(void);
+};
+
 /* NOTE: if you want to add/delete the entries after net_run(), you need to protect these lists with a mutex. */
 static struct net_device *devices;
 static struct net_protocol *protocols;
+static struct net_timer *timers;
 
 struct net_device *
 net_device_alloc(void)
@@ -166,23 +176,65 @@ net_protocol_register(uint16_t type, void (*handler)(const uint8_t *data, size_t
     return 0;
 }
 
+/* NOTE: must not be call after net_run() */
 int
-net_input_handler(uint16_t type, const uint8_t *data, size_t len, struct net_device *dev)
+net_timer_register(struct timeval interval, void (*handler)(void))
+{
+    struct net_timer *timer;
+    timer = memory_alloc(sizeof(*timer));
+    if (!timer) {
+        errorf("memory_alloc() failure");
+        return -1;
+    }
+
+    timer->interval = interval;
+    gettimeofday(&timer->last, NULL);
+    timer->handler = handler;
+
+    timer->next = timers;
+    timers = timer;
+
+    infof("registered: interval={%d, %d}", interval.tv_sec, interval.tv_usec);
+    return 0;
+}
+
+int
+net_timer_handler(void) {
+    struct net_timer *timer;
+    struct timeval now, diff;
+    for (timer = timers; timer; timer = timer->next)
+    {
+        gettimeofday(&now, NULL);
+        timersub(&now, &timer->last, &diff);
+        if (timercmp(&timer->interval, &diff, <) != 0) {
+            /* true (!0) or false (0) */
+            timer->handler();
+            gettimeofday(&timer->last, NULL);
+        }
+    }
+    return 0;
+}
+
+int net_input_handler(uint16_t type, const uint8_t *data, size_t len, struct net_device *dev)
 {
     struct net_protocol *proto;
     struct net_protocol_queue_entry *entry;
 
-    for (proto = protocols; proto; proto = proto->next) {
-        if (proto->type == type) {
+    for (proto = protocols; proto; proto = proto->next)
+    {
+        if (proto->type == type)
+        {
             entry = memory_alloc(sizeof(*entry) + len);
-            if (!entry) {
+            if (!entry)
+            {
                 errorf("memory_alloc() failure");
                 return -1;
             }
             entry->dev = dev;
             entry->len = len;
             memcpy(entry->data, data, len);
-            if (!queue_push(&proto->queue, entry)) {
+            if (!queue_push(&proto->queue, entry))
+            {
                 errorf("queue_push() failure");
                 memory_free(entry);
                 return -1;
@@ -203,10 +255,13 @@ net_softirq_handler(void)
     struct net_protocol *proto;
     struct net_protocol_queue_entry *entry;
 
-    for (proto = protocols; proto; proto = proto->next) {
-        while (1) {
+    for (proto = protocols; proto; proto = proto->next)
+    {
+        while (1)
+        {
             entry = queue_pop(&proto->queue);
-            if (!entry) {
+            if (!entry)
+            {
                 break;
             }
             debugf("queue popped (num:%u), dev=%s, type=0x%04x, len=%zu", proto->queue.num, entry->dev->name, proto->type, entry->len);
@@ -223,12 +278,14 @@ net_run(void)
 {
     struct net_device *dev;
 
-    if (intr_run() == -1) {
+    if (intr_run() == -1)
+    {
         errorf("intr_run() failure");
         return -1;
     }
     debugf("open all devices...");
-    for (dev = devices; dev; dev = dev->next) {
+    for (dev = devices; dev; dev = dev->next)
+    {
         net_device_open(dev);
     }
     debugf("running...");
@@ -241,7 +298,8 @@ net_shutdown(void)
     struct net_device *dev;
 
     debugf("close all devices...");
-    for (dev = devices; dev; dev = dev->next) {
+    for (dev = devices; dev; dev = dev->next)
+    {
         net_device_close(dev);
     }
     intr_shutdown();
@@ -269,7 +327,7 @@ net_init(void)
 
     if (arp_init() == -1)
     {
-        errorf("icmp_init() failure");
+        errorf("arp_init() failure");
         return -1;
     }
     infof("initialized");
